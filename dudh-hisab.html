@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>দুধ কেনাবেচার হিসাব</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        label { font-weight: bold; margin-top: 10px; display: block; }
+        input, select, button { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #28a745; color: white; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
+        button:hover { background-color: #218838; }
+        button.secondary { background-color: #dc3545; }
+        button.secondary:hover { background-color: #c82333; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #007bff; color: white; }
+        .summary { margin-top: 20px; padding: 12px; background-color: #eef6ff; border-radius: 6px; }
+        .summary p { margin: 4px 0; font-weight: bold; }
+        .summary .purchase { color: #dc3545; }
+        .summary .sale { color: #28a745; }
+        .del-btn { background: none; border: none; color: #dc3545; font-weight: bold; cursor: pointer; padding: 0; margin: 0; width: auto; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>🥛 দুধ কেনাবেচার রেজিস্টার</h2>
+
+    <label>লেনদেনের ধরন:</label>
+    <select id="type">
+        <option value="ক্রয় (Purchase)">ক্রয় (Purchase)</option>
+        <option value="বিক্রয় (Sale)">বিক্রয় (Sale)</option>
+    </select>
+    <label>গ্রাহক/খামারীর নাম:</label>
+    <input type="text" id="name" placeholder="নাম লিখুন">
+    <label>দুধের পরিমাণ (লিটার):</label>
+    <input type="number" id="liter" placeholder="০" oninput="calculateTotal()">
+    <label>প্রতি লিটারের দাম (টাকা):</label>
+    <input type="number" id="rate" placeholder="০" oninput="calculateTotal()">
+    <label>মোট টাকা:</label>
+    <input type="number" id="total" placeholder="০" readonly>
+    <button onclick="addRecord()">এন্ট্রি সেভ করুন</button>
+    <button class="secondary" onclick="clearAll()">সব মুছে ফেলুন</button>
+
+    <div class="summary" id="summary"></div>
+
+    <h3>আজকের হিসাব</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>ধরন</th>
+                <th>নাম</th>
+                <th>লিটার</th>
+                <th>মোট (₹)</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="recordList"></tbody>
+    </table>
+</div>
+<script>
+    const STORAGE_KEY = 'dudh_hisab_records';
+
+    function loadRecords() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveRecords(records) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    function calculateTotal() {
+        let liter = parseFloat(document.getElementById('liter').value) || 0;
+        let rate = parseFloat(document.getElementById('rate').value) || 0;
+        document.getElementById('total').value = liter * rate;
+    }
+
+    function addRecord() {
+        let type = document.getElementById('type').value;
+        let name = document.getElementById('name').value.trim();
+        let liter = parseFloat(document.getElementById('liter').value);
+        let rate = parseFloat(document.getElementById('rate').value);
+
+        if (!name) {
+            alert('নাম লিখুন!');
+            return;
+        }
+        if (!liter || liter <= 0) {
+            alert('সঠিক পরিমাণ (লিটার) লিখুন!');
+            return;
+        }
+        if (!rate || rate <= 0) {
+            alert('সঠিক দর (প্রতি লিটারের দাম) লিখুন!');
+            return;
+        }
+
+        let total = liter * rate;
+        let records = loadRecords();
+        records.push({ type, name, liter, rate, total });
+        saveRecords(records);
+        renderRecords();
+
+        // ফিল্ড ক্লিয়ার
+        document.getElementById('name').value = '';
+        document.getElementById('liter').value = '';
+        document.getElementById('rate').value = '';
+        document.getElementById('total').value = '';
+    }
+
+    function deleteRecord(index) {
+        let records = loadRecords();
+        records.splice(index, 1);
+        saveRecords(records);
+        renderRecords();
+    }
+
+    function clearAll() {
+        if (!confirm('আজকের সব এন্ট্রি মুছে ফেলতে চান?')) return;
+        saveRecords([]);
+        renderRecords();
+    }
+
+    function renderRecords() {
+        let records = loadRecords();
+        let table = document.getElementById('recordList');
+        table.innerHTML = '';
+
+        let totalPurchase = 0;
+        let totalSale = 0;
+
+        records.forEach((r, i) => {
+            let row = table.insertRow();
+            row.innerHTML = `<td>${r.type}</td><td>${r.name}</td><td>${r.liter} L</td><td>₹${r.total}</td>` +
+                `<td><button class="del-btn" onclick="deleteRecord(${i})">✕</button></td>`;
+
+            if (r.type.includes('ক্রয়')) {
+                totalPurchase += r.total;
+            } else {
+                totalSale += r.total;
+            }
+        });
+
+        document.getElementById('summary').innerHTML =
+            `<p class="purchase">মোট ক্রয়: ₹${totalPurchase}</p>` +
+            `<p class="sale">মোট বিক্রয়: ₹${totalSale}</p>` +
+            `<p>নিট (বিক্রয় - ক্রয়): ₹${totalSale - totalPurchase}</p>`;
+    }
+
+    // পেজ লোড হলে আগের ডেটা দেখাও
+    renderRecords();
+</script>
+</body>
+</html>
